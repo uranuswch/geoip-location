@@ -24,20 +24,15 @@ jobs:
       - name: Generate MMDB
         run: ./geoip-gen
 
-      - name: Check for changes
-        id: diff
-        run: |
-          if [ -f China-only.mmdb ]; then
-            echo "mmdb_exists=true" >> "$GITHUB_OUTPUT"
-            git diff --quiet China-only.mmdb China-only.mmdb.sha256 || echo "changed=true" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Push to release branch
-        if: steps.diff.outputs.changed == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -B release
           git add China-only.mmdb China-only.mmdb.sha256
-          git commit -m "Update China-only.mmdb $(date -u +%Y-%m-%d)"
-          git push origin release --force
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update China-only.mmdb $(date -u +%Y-%m-%d)"
+            git push origin release --force
+          fi
