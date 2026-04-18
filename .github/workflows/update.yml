@@ -1,0 +1,43 @@
+name: Update China IP MMDB
+
+on:
+  schedule:
+    - cron: '17 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        run: go build -o geoip-gen ./cmd/geoip-gen/
+
+      - name: Generate MMDB
+        run: ./geoip-gen
+
+      - name: Check for changes
+        id: diff
+        run: |
+          if [ -f China-only.mmdb ]; then
+            echo "mmdb_exists=true" >> "$GITHUB_OUTPUT"
+            git diff --quiet China-only.mmdb China-only.mmdb.sha256 || echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Push to release branch
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -B release
+          git add China-only.mmdb China-only.mmdb.sha256
+          git commit -m "Update China-only.mmdb $(date -u +%Y-%m-%d)"
+          git push origin release --force
